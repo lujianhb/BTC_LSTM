@@ -364,8 +364,13 @@ df
 
 # In[75]:
 
-
-df['cycle growth rate'] = df['close(t-1)'].rolling(2).apply(lambda x: x[1] - x[0])
+close_t_1 = df['close(t-1)']
+close_t_1_2 = close_t_1.rolling(2)
+def diff_value(df:pd.Series):
+    arr = np.array(df)
+    return arr[1] - arr[0]
+df['cycle growth rate'] = close_t_1_2.apply(diff_value)
+# df['cycle growth rate'] = close_t_1_2.apply(lambda x: x[1] - x[0])
 df['cycle growth rate'] = df['cycle growth rate'].shift(-1)
 df['cycle growth rate'].fillna(value=0, inplace=True)
 df['cycle growth rate'] = df['cycle growth rate'] / df['close(t-1)']  # close(t-1)为真实价格，close(t)，close(t+1)为预测价格
