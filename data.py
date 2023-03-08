@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import requests
 from sklearn.preprocessing import MinMaxScaler
+import numpy as np
 
 
 def get_data():
@@ -36,16 +37,19 @@ def get_data():
     # date time typecast
     df['Date'] = pd.to_datetime(df['Date'])
     df.index = df['Date']
+    df['Next'] = df['Close'].shift(-1)
+    df = df.dropna()
+    columns = ['Open', 'High', 'Low', 'Close', 'Volume', 'Next']
+    sc_df = pd.DataFrame()
+    for col in columns:
+        sc_df[col] = np.log10(df[col])
     # normalizing the exogeneous variables
     sc_in = MinMaxScaler(feature_range=(0, 1))
-    sc_df = sc_in.fit_transform(df[['Low', 'High', 'Open', 'Close', 'Volume']])
+    sc_df = sc_in.fit_transform(sc_df[columns])
     sc_df = pd.DataFrame(sc_df, index=df.index)
-    sc_df.rename(columns={0: 'Low', 1: 'High', 2: 'Open', 3: 'Close', 4: 'Volume'}, inplace=True)
-    sc_df['Next'] = sc_df['Close'].shift(-1)
-    sc_df = sc_df.dropna()
-    y = sc_df['Next']
-    x = sc_df.drop(columns=['Next'])
-    train_size = int(len(sc_df) * 0.9)
-    train_X, train_y = x[:train_size], y[:train_size]
-    test_X, test_y = x[train_size:], y[train_size:]
-    return {'trainx': train_X, 'trainy': train_y, 'testx': test_X, 'testy': test_y, 'sc_in': sc_in, 'df': df}
+    sc_df.rename(columns={0: 'Open', 1: 'High', 2: 'Low', 3: 'Close', 4: 'Volume', 5: 'Next'}, inplace=True)
+    return {
+        'trans': sc_in,
+        'df': sc_df,
+        'odf': df,
+    }

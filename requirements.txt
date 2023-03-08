@@ -1,7 +1,7 @@
 keras
 scikit-learn
 plotly
-tensorflow
+tensorflow==2.11.0
 matplotlib
 pandas
 jupyter

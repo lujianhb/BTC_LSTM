@@ -1,0 +1,3 @@
+[submodule "bricks-logging"]
+	path = bricks-logging
+	url = git@gitee.comn:skmysjjs/bricks-logging.git
