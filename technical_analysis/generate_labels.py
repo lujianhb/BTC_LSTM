@@ -7,6 +7,7 @@ import sys
 
 class Genlabels(object):
     def __init__(self, data, window, polyorder=3, smooth=False, graph=False):
+
         # check for valid parameters
         try:
             if window%2 == 0: raise ValueError('Window length must be an odd positive value')
@@ -16,12 +17,12 @@ class Genlabels(object):
 
         # load historic data from file
         self.hist = data
-        self.window = window
-        self.polyorder = polyorder
-        self.smooth = smooth
 
         # filter data and generate labels
         if smooth:
+            self.window = window
+            self.polyorder = polyorder
+            self.smooth = smooth
             self.savgol = self.apply_filter(deriv=0)
             self.savgol_deriv = self.apply_filter(deriv=1)
         else:

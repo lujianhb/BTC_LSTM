@@ -1,2 +1,7 @@
 .idea/
 *.csv
+*.h5
+*.jpg
+__pycache__
+log/
+logs/

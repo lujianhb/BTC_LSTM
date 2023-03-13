@@ -91,6 +91,8 @@ assert len(close) == len(oclose)
 vol = np.array(df['Volume'])
 nclose = len(close)
 balance = 1
+BATCH_SIZE = 1  # 128  # 6
+EPOCHS = 10
 balances = []
 balance_close = []
 num = 650
@@ -107,7 +109,7 @@ for j in range(num, 350, -1):
     model_file_name = f'{dir_name}/lstm_model_{j}.h5'
     if os.path.exists(model_file_name):
         model = keras.models.load_model(model_file_name)
-    else:
+    elif 1==1:
         model = Sequential()
         model.add(LSTM(32, input_shape=(X.shape[1], X.shape[2]), return_sequences=True))
         model.add(Dropout(0.2))
@@ -130,6 +132,72 @@ for j in range(num, 350, -1):
             validation_data=(data['val'][0], data['val'][1])
         )
         model.save(model_file_name)
+    else:
+        train_x = data['train'][0]
+        train_y = data['train'][1]
+        validation_x, validation_y = data['val']
+        model = Sequential()
+        model.add(LSTM(128, batch_input_shape=(BATCH_SIZE, train_x.shape[1], train_x.shape[2]),
+                       input_shape=(train_x.shape[1:]),
+                       return_sequences=True))
+        model.add(Dropout(0.2))
+        model.add(BatchNormalization())
+
+        model.add(LSTM(128, batch_input_shape=(BATCH_SIZE, train_x.shape[1], train_x.shape[2]), return_sequences=True))
+        model.add(Dropout(0.2))
+        model.add(BatchNormalization())
+
+        model.add(LSTM(128, batch_input_shape=(BATCH_SIZE, train_x.shape[1], train_x.shape[2]), ))
+        model.add(Dropout(0.2))
+        model.add(BatchNormalization())
+
+        model.add(Dense(32, activation='relu'))
+        model.add(Dropout(0.2))
+
+        model.add(Dense(3, activation='softmax'))
+
+        opt = tf.keras.optimizers.Adam(lr=0.001, decay=1e-6)
+
+        # Compile model
+        model.compile(
+            loss='sparse_categorical_crossentropy',
+            optimizer=opt,
+            metrics=['sparse_categorical_accuracy']
+        )
+
+        tensorboard = TensorBoard(log_dir="logs/{}".format(NAME))
+
+        # unique file name that will include the epoch and the validation acc for that epoch
+        filepath = NNNAME + "-{epoch:02d}-{val_acc:.3f}"
+        checkpoint = ModelCheckpoint("models/{}.model".format(filepath, monitor='val_sparse_categorical_accuracy',
+                                                              verbose=1, save_best_only=True,
+                                                              mode='max'))  # saves only the best ones
+        train_weights = class_weight.compute_class_weight('balanced',
+                                                          np.unique(train_y),
+                                                          train_y)
+        print("train_weights", train_weights)
+        # Train model
+        history = model.fit(
+            train_x, train_y,
+            batch_size=BATCH_SIZE,
+            epochs=EPOCHS,
+            shuffle=False,
+            validation_data=(validation_x, validation_y),
+            # class_weight=dict(enumerate(train_weights)),
+            callbacks=[tensorboard, checkpoint],
+            class_weight=train_weights,
+        )
+        val_weights = class_weight.compute_class_weight('balanced',
+                                                        np.unique(validation_y),
+                                                        validation_y)
+
+        val_sample_weights = training_utils.standardize_weights(np.array(validation_y),
+                                                                class_weight=dict(enumerate(val_weights)))
+
+        # Score model
+        score = model.evaluate(validation_x, validation_y, verbose=0, sample_weight=val_sample_weights)
+        model.save(model_file_name)
+
     y_predict = model.predict(data['test'][0])
     y_predict_val = model.predict(data['val'][0])
     close_today = oclose[nclose - 2 - j]
