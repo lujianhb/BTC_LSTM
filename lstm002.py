@@ -185,16 +185,16 @@ for j in range(num, -1, -1):
         #     metrics=['sparse_categorical_accuracy']
         # )
         #
-        tensorboard = TensorBoard(log_dir="logs/{}".format(dir_name))
-
-        NNNAME = "LSTM_STATEFUL"
-        # unique file name that will include the epoch and the validation acc for that epoch
-        filepath = NNNAME + "-{epoch:02d}-{val_acc:.3f}"
-        checkpoint = ModelCheckpoint("models/{}.model".format(
-            filepath, monitor='val_sparse_categorical_accuracy',
-            verbose=1, save_best_only=True,
-            mode='max'
-        ))  # saves only the best ones
+        # tensorboard = TensorBoard(log_dir="logs/{}".format(dir_name))
+        #
+        # NNNAME = "LSTM_STATEFUL"
+        # # unique file name that will include the epoch and the validation acc for that epoch
+        # filepath = NNNAME + "-{epoch:02d}-{val_acc:.3f}"
+        # checkpoint = ModelCheckpoint("models/{}.model".format(
+        #     filepath, monitor='val_sparse_categorical_accuracy',
+        #     verbose=1, save_best_only=True,
+        #     mode='max'
+        # ))  # saves only the best ones
         # Train model
         history = model.fit(
             train_x, train_y,
@@ -238,10 +238,6 @@ for j in range(num, -1, -1):
         balances.append(balance)
         balances1.append(balance1)
         predicts.append(y_predict[-1][0])
-        # assert close[nclose - 4 - j] == data['train'][0][-1][-1][
-        #     2], f'{close[nclose - 4 - j]}, {data["train"][0][-1][-1][2]}'
-        # assert close[nclose - 3 - j] == data['val'][0][-1][-1][2], f'{close[nclose - 3 - j]}, {data["val"][0][-1][-1][2]}'
-        # assert close[nclose - 2 - j] == data['test'][0][-1][-1][2], f'{close[nclose - 2 - j]}, {data["test"][0][-1][-1][2]}'
         unknow_predict = model.predict(data['predict'][0])
         logger.info(
             f'{j},{unknow_predict}, {yindex[-1]}, b:{balance}, b1:{balance1}: p:{y_predict[-1][0]},pv:{y_predict_val[-1][0]},t:{close_today}, n:{close_Next}, v:{data["val"][1][-1, :]}')
