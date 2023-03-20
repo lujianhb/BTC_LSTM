@@ -41,7 +41,8 @@ df = pd.DataFrame()
 columes = []
 columedic = {}
 BATCH_SIZE = 1
-EPOCHS = 10
+EPOCHS = 20
+learning_rate = 0.01
 i = 0
 for base in bases:
     df[f'{base}_Close0'] = dats[base]['Close']
@@ -65,9 +66,12 @@ def extract_data(sc_df):
     close = np.array(sc_df[f'BTC_Close'])
     dclose = [0]
     dclose2 = np.diff(close, prepend=0)
-    for i in range(0, len(close)-1):
-        dclose.append(close[i+1] - close[i])
-        assert dclose2[i+1] == dclose[-1]
+    for i in range(0, len(close) - 1):
+        dclose.append(close[i + 1] - close[i])
+        assert dclose2[i + 1] == dclose[-1]
+    # labels = np.round((np.power(10, dclose) - 1) * 100)
+    # labels[labels < -4] = -4
+    # labels[labels > 4] = 4
     dclose = np.array(dclose)
     labels = np.zeros(np.shape(dclose))
     labels[dclose > 0] = 1
@@ -111,12 +115,14 @@ def shape_data(X, y, yindex, timesteps):
     return X, y, yindex
 
 
-def adjust_data(X, y, yindex, train_idx=-2, test_index=-1):
+def adjust_data(X, y, yindex, test_index=-1, val_num=1):
     # save some data for testing
     test_index = len(y) + test_index
+    train_idx = test_index - val_num
+    # train_idx = -2
     X_train, y_train, yindex_train = X[:train_idx - 1], y[1:train_idx], yindex[1:train_idx]
-    X_val, y_val, yindex_val = X[train_idx - 1:test_index - 1], y[train_idx:test_index], yindex[
-                                                                                         train_idx:test_index]
+    X_val, y_val, yindex_val = X[test_index - 1 - val_num:test_index - 1], y[test_index - val_num:test_index], \
+                               yindex[test_index - val_num:test_index]
     x_test, y_test, yindex_test = X[test_index - 1:-1], y[test_index:], yindex[test_index:]
     y_train = to_categorical(y_train, 2)
     y_val = to_categorical(y_val, 2)
@@ -136,13 +142,13 @@ balances1 = []
 balance_close = []
 num = 650
 predicts = []
-dir_name = f'modules2_kdjvol17'
+dir_name = f'modules2_kdjvol25'
 # dir_name = f'modules2_kdjvol16'
 os.makedirs(dir_name, exist_ok=True)
-for j in range(num, -1, -1):
-    curr_df = sc_df[num - j:nclose - j]
+for j in range(num, 0, -1):
+    curr_df = sc_df[1000 + num - j:nclose - j]
     X, y, yindex = extract_data(curr_df)
-    X, y, yindex = shape_data(X, y, yindex, 10)
+    X, y, yindex = shape_data(X, y, yindex, 2)
     data = adjust_data(X, y, yindex)  # 回测
     # data = adjust_data(X, y, yindex, train_idx=-1, test_index=0)  # 预测当天涨跌
     yi = f'{yindex[-1]}'[:-9]
@@ -160,9 +166,9 @@ for j in range(num, -1, -1):
         model.add(Dropout(0.2))
         model.add(BatchNormalization())
 
-        model.add(LSTM(128, batch_input_shape=(BATCH_SIZE, train_x.shape[1], train_x.shape[2]), return_sequences=True))
-        model.add(Dropout(0.2))
-        model.add(BatchNormalization())
+        # model.add(LSTM(128, batch_input_shape=(BATCH_SIZE, train_x.shape[1], train_x.shape[2]), return_sequences=True))
+        # model.add(Dropout(0.2))
+        # model.add(BatchNormalization())
 
         model.add(LSTM(128, batch_input_shape=(BATCH_SIZE, train_x.shape[1], train_x.shape[2]), ))
         model.add(Dropout(0.2))
@@ -173,7 +179,7 @@ for j in range(num, -1, -1):
 
         model.add(Dense(2, activation='softmax'))
 
-        opt = Adam(learning_rate=0.001, decay=1e-6)
+        opt = Adam(learning_rate=learning_rate, decay=1e-6)
         model.compile(loss='categorical_crossentropy',
                       optimizer=opt,
                       metrics=['accuracy'])
@@ -224,15 +230,17 @@ for j in range(num, -1, -1):
         close_Next = oclose[nclose - 1 - j]  # 预测倒数第几天
         assert close_index[nclose - 1 - j] == curr_df.index[-1]
         assert data['val'][2][-1] == close_index[nclose - 2 - j]
-        assert data['train'][2][-1] == close_index[nclose - 3 - j]
+        # assert data['train'][2][-1] == close_index[nclose - 3 - j]
         btc_close = np.array(curr_df['BTC_Close'])
-        assert data['train'][0][-1][-1][0] == btc_close[-4]
+        # assert data['train'][0][-1][-1][0] == btc_close[-4]
         assert data['val'][0][-1][-1][0] == btc_close[-3]
         balance_close.append(close_Next)
+        assert len(y_predict[-1]) == 2
+        # if np.sum(y_predict[-1][0:4]) < np.sum(y_predict[-1][5:]):  # 看涨
         if y_predict[-1][0] < 0.5:  # 看涨
             balance = balance * close_Next / close_today
             balance1 = balance1 * np.power(10, btc_close[-1] - btc_close[-2])
-        elif y_predict[-1][0] > 0.5:
+        else:
             balance = balance * 2 - balance * close_Next / close_today
             balance1 = balance1 * 2 - balance1 * np.power(10, btc_close[-1] - btc_close[-2])
         balances.append(balance)
@@ -240,7 +248,7 @@ for j in range(num, -1, -1):
         predicts.append(y_predict[-1][0])
         unknow_predict = model.predict(data['predict'][0])
         logger.info(
-            f'{j},{unknow_predict}, {yindex[-1]}, b:{balance}, b1:{balance1}: p:{y_predict[-1][0]},pv:{y_predict_val[-1][0]},t:{close_today}, n:{close_Next}, v:{data["val"][1][-1, :]}')
+            f'{j},{unknow_predict}, {yindex[-1]}, b:{balance}, b1:{balance1}: p:{y_predict[-1]},pv:{y_predict_val[-1]},t:{close_today}, n:{close_Next}, v:{data["val"][1]}')
     else:  # 预测今天收盘涨跌
         unknow_predict = model.predict(data['predict'][0])
         logger.info(f'predict:{unknow_predict}')
